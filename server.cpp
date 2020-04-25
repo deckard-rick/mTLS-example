@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <pthread.h>
+
 #define PORT 8080
 
 class ClearingServerSocket {
@@ -51,25 +53,42 @@ void ClearingServerSocket::setup(sockaddr_in *t_address)
 	}
 }
 
+void *connection_handler(void *socket_desc)
+{
+  //Get the socket descriptor
+   int sock = *(int*)socket_desc;
+   char buffer[1024];
+   char hello[] = "Hello from server";
+
+   int valread = read(sock , buffer, 1024);
+ 	 printf("%s\n",buffer );
+
+   send(sock , hello , strlen(hello) , 0 );
+ 	 printf("Hello message sent\n");
+
+   pthread_exit(NULL);
+}
+
 void ClearingServerSocket::loop()
 {
   int valread = 0;
   char buffer[1024] = {0};
-  char hello[] = "Hello from server";
-  int new_socket = 0;
+  int client_socket = 0;
   int addrlen = sizeof(address);
+  pthread_t thread_id;
 
-  if ((new_socket = accept(server_fd, (struct sockaddr *)&address,
-					(socklen_t*)&addrlen))<0)
-	{
-		perror("accept");
-		exit(EXIT_FAILURE);
-	}
+  while( client_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen) )
+      {
+          printf("Connection accepted");
 
-  valread = read( new_socket , buffer, 1024);
-	printf("%s\n",buffer );
-	send(new_socket , hello , strlen(hello) , 0 );
-	printf("Hello message sent\n");
+          if( pthread_create( &thread_id , NULL ,  connection_handler, (void*) &client_socket) < 0)
+          {
+              perror("could not create thread");
+          }
+          printf("Handler assigned");
+      }
+
+  pthread_exit(NULL);
 }
 
 int main(int argc, char const *argv[])
