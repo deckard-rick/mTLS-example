@@ -1,5 +1,17 @@
+//Step 1
 // Server side C/C++ program to demonstrate Socket programming
 //Source: https://www.geeksforgeeks.org/socket-programming-cc/
+
+//Step 2
+//Klasse ClearingServerSocket
+
+//Step 3
+//Threading
+//https://dzone.com/articles/parallel-tcpip-socket-server-with-multi-threading
+
+//Step 4
+//Das mit der Klasse ist eine Fehlentwicklung, das macht es in dem kleinen Beispiel nur
+//komplex, wieder raus, und dann schauen wir mal.
 
 #include <unistd.h>
 #include <stdio.h>
@@ -11,18 +23,8 @@
 
 #define PORT 8080
 
-class ClearingServerSocket {
-public:
-  void setup(sockaddr_in *t_address);
-  void loop();
-private:
-  int server_fd;
-  struct sockaddr_in *address;
-};
-
-void ClearingServerSocket::setup(sockaddr_in *t_address)
+void socket_setup(sockaddr_in *address, int &server_fd)
 {
-  address = t_address;
 	int opt = 1;
 
 	// Creating socket file descriptor
@@ -61,6 +63,7 @@ void *connection_handler(void *socket_desc)
    char hello[] = "Hello from server";
 
    int valread = read(sock , buffer, 1024);
+   //WARNING: Das beide einfach auf printf rausrotzen ist natürlich nichts.
  	 printf("%s\n",buffer );
 
    send(sock , hello , strlen(hello) , 0 );
@@ -69,7 +72,7 @@ void *connection_handler(void *socket_desc)
    pthread_exit(NULL);
 }
 
-void ClearingServerSocket::loop()
+void socket_loop(sockaddr_in *address, int server_fd)
 {
   int valread = 0;
   char buffer[1024] = {0};
@@ -81,9 +84,9 @@ void ClearingServerSocket::loop()
       {
           printf("Connection accepted");
 
-          if( pthread_create( &thread_id , NULL ,  connection_handler, (void*) &client_socket) < 0)
+          if( pthread_create(&thread_id , NULL ,  connection_handler, (void*) &client_socket) < 0)
           {
-              perror("could not create thread");
+              printf("could not create thread");
           }
           printf("Handler assigned");
       }
@@ -93,15 +96,15 @@ void ClearingServerSocket::loop()
 
 int main(int argc, char const *argv[])
 {
-  ClearingServerSocket socket;
-
   struct sockaddr_in address;
   address.sin_family = AF_INET;
 	address.sin_addr.s_addr = INADDR_ANY;
 	address.sin_port = htons( PORT );
 
-  socket.setup(&address);
-  socket.loop();
+  int server_fd;
+
+  socket_setup(&address,server_fd);
+  socket_loop(&address,server_fd);
 
   return 0;
 }
