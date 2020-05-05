@@ -51,8 +51,8 @@ class serverContext
   public:
     bool withSSL = true;
     SSL_CTX *ctx = NULL;
-    char cert[MAXFILENAME+1] = "server-cert.crt";
-    char key[MAXFILENAME+1] = "server-key.pem";
+    char cert[MAXFILENAME+1] = "../certs/server/server-cert.crt";
+    char key[MAXFILENAME+1] = "../certs/server/server-key.pem";
     int serverSocket = -1;
 };
 
@@ -81,12 +81,12 @@ SSL_CTX *create_context()
 void configure_context(serverContext *srvCtx)
 {
     SSL_CTX_set_ecdh_auto(srvCtx->ctx, 1);
-    //SSL_CTX_set_verify(srvCtx->ctx, SSL_VERIFY_PEER or SSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
-    SSL_CTX_set_verify(srvCtx->ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_verify(srvCtx->ctx, SSL_VERIFY_PEER or SSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
+    //SSL_CTX_set_verify(srvCtx->ctx, SSL_VERIFY_PEER, NULL);
     //SSL_CTX_ctrl(srvCtx->ctx,SSL_CTRL_GET_CLIENT_CERT_REQUEST,0,NULL);
     //SSL_CTX_load_verify_locations(srvCtx->ctx,NULL,"./clients");
 
-    char cafile[] = "ca-cert.pem";
+    char cafile[] = "../certs/server/ca-cert.pem";
     //SSL_CTX_set_client_CA_list(srvCtx->ctx,SSL_load_client_CA_file(cafile));
     if (!SSL_CTX_use_certificate_chain_file(srvCtx->ctx, cafile))
       {
