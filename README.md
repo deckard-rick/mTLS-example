@@ -5,4 +5,4 @@ Small experimental server and client, with
 * ip socket communication
 * ssl encryption
 
-now working on mTLS, authentification with certifictes but still some problems.
+now working on mTLS, authentification with certificates, but still some problems.
