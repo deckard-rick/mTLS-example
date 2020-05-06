@@ -30,8 +30,8 @@
 //  eigentlich fehlte im Client nur SSL_CTX_new(SSLv23_client_method()); statt SSL_CTX_new(TLS_server_method());
 
 //Step 6
-//Authorisierung
-//
+//Authorisierung, mutal TLS (mTSL)
+//something is wrong with the certificates
 
 #include <unistd.h>
 #include <stdio.h>
@@ -51,8 +51,8 @@ class serverContext
   public:
     bool withSSL = true;
     SSL_CTX *ctx = NULL;
-    char cert[MAXFILENAME+1] = "../certs/server/server-cert.crt";
-    char key[MAXFILENAME+1] = "../certs/server/server-key.pem";
+    char cert[MAXFILENAME+1] = "../certs/server/server.crt";
+    char key[MAXFILENAME+1] = "../certs/server/server.key";
     int serverSocket = -1;
 };
 
@@ -82,12 +82,10 @@ void configure_context(serverContext *srvCtx)
 {
     SSL_CTX_set_ecdh_auto(srvCtx->ctx, 1);
     SSL_CTX_set_verify(srvCtx->ctx, SSL_VERIFY_PEER or SSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
-    //SSL_CTX_set_verify(srvCtx->ctx, SSL_VERIFY_PEER, NULL);
-    //SSL_CTX_ctrl(srvCtx->ctx,SSL_CTRL_GET_CLIENT_CERT_REQUEST,0,NULL);
-    //SSL_CTX_load_verify_locations(srvCtx->ctx,NULL,"./clients");
 
-    char cafile[] = "../certs/server/ca-cert.pem";
-    //SSL_CTX_set_client_CA_list(srvCtx->ctx,SSL_load_client_CA_file(cafile));
+    SSL_CTX_load_verify_locations(srvCtx->ctx,NULL,"../certs");
+
+    char cafile[] = "../certs/server/ca.crt";
     if (!SSL_CTX_use_certificate_chain_file(srvCtx->ctx, cafile))
       {
         ERR_print_errors_fp(stderr);
@@ -156,7 +154,7 @@ void *connection_handler(void *socket_desc)
    printf("Beginn connection handling.\n");
 
    char buffer[1024];
-   char hello[] = "Hello from server via SSL\n";
+   char hello[] = "Hello from server via SSL";
 
    SSL *ssl = NULL;
    if (cc->sCtx->withSSL)
@@ -174,24 +172,6 @@ void *connection_handler(void *socket_desc)
          }
      }
 
-   /**
-    * Versuch das Client-Zertifikat zu lesen
-    * geht aber nicht
-   X509 *cert = SSL_get_peer_certificate(ssl);
-   if (cert == NULL)
-     printf("Error: Could not get a certificate from: %s.\n", "");
-   else
-     printf("Retrieved the server's certificate from: %s.\n", "");
-
-   X509_NAME *certname = X509_NAME_new();
-   certname = X509_get_subject_name(cert);
-
-   printf("Displaying the certificate subject data:\n");
-   BIO *  bio  = BIO_new_fp(stdout, BIO_NOCLOSE);
-   X509_NAME_print_ex(bio, certname, 0, 0);
-   printf("\n");
-   */
-
    if (cc->sCtx->withSSL)
      SSL_read( ssl, buffer, 1024);
    else
@@ -199,9 +179,9 @@ void *connection_handler(void *socket_desc)
    printf("out: %s\n",buffer);
 
    if (cc->sCtx->withSSL)
-      SSL_write(ssl, hello, strlen(hello));
+      SSL_write(ssl, hello, strlen(hello)+1); //+1, damit das \0 mitgesendet wird.
    else
-      send(cc->socket , hello , strlen(hello) , 0);
+      send(cc->socket , hello , strlen(hello)+1 , 0);
  	 printf("Hello server message sent\n");
 
    if (cc->sCtx->withSSL)
@@ -253,6 +233,7 @@ int main(int argc, char const *argv[])
 
   serverContext *srvCtx = new serverContext();
 
+  //some overhead for the arguments
   for (int i=0; i<argc; ++i)
     {
       if (strcmp(argv[i],"-plain")==0)
@@ -263,6 +244,7 @@ int main(int argc, char const *argv[])
         strncpy(srvCtx->key,argv[i+1],MAXFILENAME);
     }
 
+  //argument -plain cca deaktivate ssl for test purposes (it is all an example)
   if (srvCtx->withSSL = true)
     {
       srvCtx->ctx = create_context();

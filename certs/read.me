@@ -1,0 +1,29 @@
+//Example how to generate keys for mTLS
+//https://rollout.io/blog/how-to-set-up-mutual-tls-authentication/
+
+//ca
+openssl genrsa -aes256 -out ca/ca.key 4096
+Passwort: caroline
+
+openssl req -new -x509 -sha256 -days 730 -key ca.key -out ca.crt
+CommonName 42CA
+all other values default
+
+//server certificate
+openssl genrsa -out server.key 2048
+openssl req -new -key server.key -sha256 -out server.csr
+CommonName should be FQDN: debiandevdesktop01.sdctec.lokal
+
+openssl x509 -req -days 365 -sha256 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt
+
+openssl verify -CAfile ca.crt server.crt
+verify  OK
+
+// client certificate like server certificate
+openssl genrsa -out client.key 2048
+openssl req -new -key client.key -out client.csr
+CommonName CLIENT001
+openssl x509 -req -days 365 -sha256 -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt
+
+openssl verify -CAfile ca.crt client.crt
+verify OK

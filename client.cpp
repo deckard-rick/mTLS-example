@@ -29,26 +29,25 @@ SSL_CTX *create_context()
 void configure_context(SSL_CTX *ctx)
 {
     SSL_CTX_set_ecdh_auto(ctx, 1);
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
 
     // Set the key and cert
-    if (!SSL_CTX_use_certificate_chain_file(ctx, "../certs/client/ca-cert.pem"))
+    if (!SSL_CTX_use_certificate_chain_file(ctx, "../certs/client/ca.crt"))
       {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
       }
-    if (SSL_CTX_use_certificate_file(ctx, "../certs/client/client-cert.crt", SSL_FILETYPE_PEM) <= 0)
+    if (SSL_CTX_use_certificate_file(ctx, "../certs/client/client.crt", SSL_FILETYPE_PEM) <= 0)
       {
         ERR_print_errors_fp(stderr);
 	      exit(EXIT_FAILURE);
       }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, "../certs/client/client-key.pem", SSL_FILETYPE_PEM) <= 0 )
+    if (SSL_CTX_use_PrivateKey_file(ctx, "../certs/client/client.key", SSL_FILETYPE_PEM) <= 0 )
       {
         ERR_print_errors_fp(stderr);
 	      exit(EXIT_FAILURE);
       }
-    //SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
-
 }
 
 int main(int argc, char const *argv[])
@@ -56,9 +55,9 @@ int main(int argc, char const *argv[])
 	int sock = 0, valread;
 	struct sockaddr_in serv_addr;
   bool withSSL = true;
-  char certfile[MAXFILENAME+1] = "cert.pem";
-  char keyfile[MAXFILENAME+1] = "key.pem";
-	char hello[] = "Hello from client\n";
+  //char certfile[MAXFILENAME+1] = "cert.pem";
+  //char keyfile[MAXFILENAME+1] = "key.pem";
+	char hello[] = "Hello from client via SSL";
 	char buffer[1024] = {0};
 
   SSL_CTX *ctx = NULL;
@@ -68,10 +67,10 @@ int main(int argc, char const *argv[])
     {
       if (strcmp(argv[i],"-plain")==0)
         withSSL = false;
-      else if ((strcmp(argv[i],"-cert")==0) && (i+1 < argc) && (strlen(argv[i+1]) > 0))
-        strncpy(certfile,argv[i+1],MAXFILENAME);
-      else if ((strcmp(argv[i],"-key")==0) && (i+1 < argc) && (strlen(argv[i+1]) > 0))
-        strncpy(keyfile,argv[i+1],MAXFILENAME);
+      //else if ((strcmp(argv[i],"-cert")==0) && (i+1 < argc) && (strlen(argv[i+1]) > 0))
+      //  strncpy(certfile,argv[i+1],MAXFILENAME);
+      //else if ((strcmp(argv[i],"-key")==0) && (i+1 < argc) && (strlen(argv[i+1]) > 0))
+      //  strncpy(keyfile,argv[i+1],MAXFILENAME);
     }
 
   if (withSSL)
@@ -145,9 +144,9 @@ int main(int argc, char const *argv[])
     }
 
   if (withSSL)
-    SSL_write(ssl , hello , strlen(hello) );
+    SSL_write(ssl , hello , strlen(hello)+1 );
   else
-    send(sock , hello , strlen(hello) , 0 );
+    send(sock , hello , strlen(hello)+1 , 0 );
 	printf("Hello message sent\n");
 
   if (withSSL)
