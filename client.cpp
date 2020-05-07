@@ -28,16 +28,17 @@ SSL_CTX *create_context()
 
 void configure_context(SSL_CTX *ctx)
 {
-    //SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_verify_depth(ctx, 5);
 
-    // Set the key and cert
-    /*
-    if (!SSL_CTX_use_certificate_chain_file(ctx, "../certs/client/ca.crt"))
+    char cafile[] = "/home/debdev/Projects/clearing/server/certs/client/ca.crt";
+    if (!SSL_CTX_use_certificate_chain_file(ctx, cafile))
       {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
       }
-    */
+    SSL_CTX_load_verify_locations(ctx, cafile, NULL);
+
     if (SSL_CTX_use_certificate_file(ctx, "../certs/client/client.crt", SSL_FILETYPE_PEM) <= 0)
       {
         ERR_print_errors_fp(stderr);

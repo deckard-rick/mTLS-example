@@ -41,6 +41,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <openssl/ssl.h>
+#include <openssl/x509v3.h>
 #include <openssl/err.h>
 
 #define PORT 8080
@@ -81,19 +82,22 @@ SSL_CTX *create_context()
 void configure_context(serverContext *srvCtx)
 {
     //int verify_flags = SSL_VERIFY_PEER or SSL_VERIFY_FAIL_IF_NO_PEER_CERT  //meine eigene Lösung
-    //int verify_flags = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE; //Viktor 006.05.2020
+    int verify_flags = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
     //int verify_flags =SSL_VERIFY_CLIENT_ONCE; //Viktor 006.05.2020
-    int verify_flags = SSL_VERIFY_PEER; //Viktor 006.05.2020
+    //int verify_flags = SSL_VERIFY_PEER; //Viktor 006.05.2020
 
     SSL_CTX_set_verify(srvCtx->ctx, verify_flags, NULL);
+    SSL_CTX_set_verify_depth(srvCtx->ctx, 5);
 
-    char cafile[] = "/home/debdev/Projects/clearing/server/certs/client/ca.crt";
+    char cafile[] = "/home/debdev/Projects/clearing/server/certs/server/ca.crt";
 
     if (!SSL_CTX_use_certificate_chain_file(srvCtx->ctx, cafile))
       {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
       }
+    SSL_CTX_load_verify_locations(srvCtx->ctx, cafile, NULL);
+
     /*
     STACK_OF(X509_NAME) *calist = SSL_load_client_CA_file(cafile);
     if (calist == 0) {
@@ -183,6 +187,23 @@ void *connection_handler(void *socket_desc)
            ERR_print_errors_fp(stderr);
          }
      }
+
+     /**
+      * Versuch das Client-Zertifikat zu lesen
+      */
+     X509 *cert = SSL_get_peer_certificate(ssl);
+     if (cert == NULL)
+       printf("Error: Could not get a certificate from: %s.\n", "");
+     else
+       printf("Retrieved the server's certificate from: %s.\n", "");
+
+     X509_NAME *certname = X509_NAME_new();
+     certname = X509_get_subject_name(cert);
+
+     printf("Displaying the certificate subject data:\n");
+     BIO *  bio  = BIO_new_fp(stdout, BIO_NOCLOSE);
+     X509_NAME_print_ex(bio, certname, 0, 0);
+     printf("\n");
 
    if (cc->sCtx->withSSL)
      SSL_read( ssl, buffer, 1024);
