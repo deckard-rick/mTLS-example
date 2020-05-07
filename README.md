@@ -1,8 +1,9 @@
 # mTLS-example
-Example in C for mutual TLS (but still not working)
+Example in C for mutual TLS (TLS with mutual authentication)
 
 Small experimental server and client, with
 * ip socket communication
 * ssl encryption
+* mTLS, authentification with certificates
 
-now working on mTLS, authentification with certificates, but still some problems.
+07.05.2020 is now working, code will be reviewed soon
