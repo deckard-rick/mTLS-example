@@ -44,15 +44,15 @@
 #include <openssl/err.h>
 
 #define PORT 8080
-#define MAXFILENAME 63
+#define MAXFILENAME 127
 
 class serverContext
 {
   public:
     bool withSSL = true;
     SSL_CTX *ctx = NULL;
-    char cert[MAXFILENAME+1] = "../certs/server/server.crt";
-    char key[MAXFILENAME+1] = "../certs/server/server.key";
+    char cert[MAXFILENAME+1] = "/home/debdev/Projects/clearing/server/certs/server/server.crt";
+    char key[MAXFILENAME+1] = "/home/debdev/Projects/clearing/server/certs/server/server.key";
     int serverSocket = -1;
 };
 
@@ -80,17 +80,30 @@ SSL_CTX *create_context()
 
 void configure_context(serverContext *srvCtx)
 {
-    SSL_CTX_set_ecdh_auto(srvCtx->ctx, 1);
-    SSL_CTX_set_verify(srvCtx->ctx, SSL_VERIFY_PEER or SSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
+    //int verify_flags = SSL_VERIFY_PEER or SSL_VERIFY_FAIL_IF_NO_PEER_CERT  //meine eigene Lösung
+    //int verify_flags = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE; //Viktor 006.05.2020
+    //int verify_flags =SSL_VERIFY_CLIENT_ONCE; //Viktor 006.05.2020
+    int verify_flags = SSL_VERIFY_PEER; //Viktor 006.05.2020
 
-    SSL_CTX_load_verify_locations(srvCtx->ctx,NULL,"../certs");
+    SSL_CTX_set_verify(srvCtx->ctx, verify_flags, NULL);
 
-    char cafile[] = "../certs/server/ca.crt";
+    char cafile[] = "/home/debdev/Projects/clearing/server/certs/client/ca.crt";
+
     if (!SSL_CTX_use_certificate_chain_file(srvCtx->ctx, cafile))
       {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
       }
+    /*
+    STACK_OF(X509_NAME) *calist = SSL_load_client_CA_file(cafile);
+    if (calist == 0) {
+        /* Not generally critical
+        printf("error loading client CA names from: %s",cafile);
+        //msg_warn("error loading client CA names from: %s",cafile);
+        //tls_print_errors();
+    }
+    SSL_CTX_set_client_CA_list(srvCtx->ctx, calist);
+    */
 
     /* Set the key and cert */
     if (SSL_CTX_use_certificate_file(srvCtx->ctx, srvCtx->cert, SSL_FILETYPE_PEM) <= 0)
@@ -98,7 +111,6 @@ void configure_context(serverContext *srvCtx)
         ERR_print_errors_fp(stderr);
 	      exit(EXIT_FAILURE);
       }
-
     if (SSL_CTX_use_PrivateKey_file(srvCtx->ctx, srvCtx->key, SSL_FILETYPE_PEM) <= 0 )
       {
         ERR_print_errors_fp(stderr);
