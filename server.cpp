@@ -1,9 +1,13 @@
+/**
+ * Proof of concept for mutual TLS
+ */
+
 //Step 1
 // Server side C/C++ program to demonstrate Socket programming
 //Source: https://www.geeksforgeeks.org/socket-programming-cc/
 
 //Step 2
-//Klasse ClearingServerSocket
+//class ClearingServerSocket
 
 //Step 3
 //Threading
@@ -11,27 +15,40 @@
 //https://gist.github.com/oleksiiBobko/43d33b3c25c03bcc9b2b
 
 //Step 4
-//Das mit der Klasse ist eine Fehlentwicklung, das macht es in dem kleinen Beispiel nur
-//komplex, wieder raus, und dann schauen wir mal.
+//class ClearingServerSocket, was the wrong way, removed
 
 //Step 5
 //SSL
-// ein einfaches Beispiel was nicht tut, vermutlich OpenSSL 1.0.2 vs 1.1.0
+// easy example not working, I believe OpenSSL 1.0.2 vs 1.1.0
 //   https://wiki.openssl.org/index.php/Simple_TLS_Server
-// etwa unverständlich
+// not easy to understand
 //   https://quuxplusone.github.io/blog/2020/01/24/openssl-part-1/
-// Sourcen aus github geladen, da sind demos drin.
+// load openssl sources, there are examples and demos in
 //   https://github.com/openssl/openssl
-// Über die Erzeugung von Schlüsseln
+// creating keys and certificates
 //   https://www.grund-wissen.de/linux/server/openssl.html
-// Hier wird das Zertifikat abgefragt
+// how to get a certificate
 //  http://fm4dd.com/openssl/sslconnect.shtm
-//ERKENNTNIS
-//  eigentlich fehlte im Client nur SSL_CTX_new(SSLv23_client_method()); statt SSL_CTX_new(TLS_server_method());
+//Lesson learned
+//  the clients needs SSL_CTX_new(SSLv23_client_method()) instead of SSL_CTX_new(TLS_server_method())
 
 //Step 6
-//Authorisierung, mutal TLS (mTSL)
-//something is wrong with the certificates
+//  Authorisierung, mutal TLS (mTSL)
+//  https://github.com/TalkWithTLS
+
+//Step 7
+//  reading some information from the client zertificate (CN und Valid-Time)
+
+//  ToDo
+
+//Step 8
+//  JSON-Handling, that wie can interact
+//    https://github.com/DaveGamble/cJSON
+//    https://github.com/json-c/json-c
+
+//Step 9
+//  creating,renewal certificate from client via server
+//  https://stackoverflow.com/questions/256405/programmatically-create-x509-certificate-using-openssl
 
 #include <unistd.h>
 #include <stdio.h>
@@ -52,8 +69,9 @@ class serverContext
   public:
     bool withSSL = true;
     SSL_CTX *ctx = NULL;
-    char cert[MAXFILENAME+1] = "/home/debdev/Projects/clearing/server/certs/server/server.crt";
-    char key[MAXFILENAME+1] = "/home/debdev/Projects/clearing/server/certs/server/server.key";
+    char cafile[MAXFILENAME+1] = "../certs/server/ca.crt";
+    char cert[MAXFILENAME+1] = "../certs/server/server.crt";
+    char key[MAXFILENAME+1] = "../certs/server/server.key";
     int serverSocket = -1;
 };
 
@@ -64,70 +82,47 @@ class connectionContext
     serverContext *sCtx = NULL;
 };
 
-SSL_CTX *create_context()
+ void create_ssl_context(serverContext *srvCtx)
 {
-    SSL_CTX *ctx;
-
-    ctx = SSL_CTX_new(TLS_server_method());
-    if (!ctx)
-      {
-	      perror("Unable to create SSL context");
-	      ERR_print_errors_fp(stderr);
-	      exit(EXIT_FAILURE);
-      }
-
-    return ctx;
-}
-
-void configure_context(serverContext *srvCtx)
-{
-    //int verify_flags = SSL_VERIFY_PEER or SSL_VERIFY_FAIL_IF_NO_PEER_CERT  //meine eigene Lösung
-    int verify_flags = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
-    //int verify_flags =SSL_VERIFY_CLIENT_ONCE; //Viktor 006.05.2020
-    //int verify_flags = SSL_VERIFY_PEER; //Viktor 006.05.2020
-
-    SSL_CTX_set_verify(srvCtx->ctx, verify_flags, NULL);
-    SSL_CTX_set_verify_depth(srvCtx->ctx, 5);
-
-    char cafile[] = "/home/debdev/Projects/clearing/server/certs/server/ca.crt";
-
-    if (!SSL_CTX_use_certificate_chain_file(srvCtx->ctx, cafile))
-      {
-        ERR_print_errors_fp(stderr);
-        exit(EXIT_FAILURE);
-      }
-    SSL_CTX_load_verify_locations(srvCtx->ctx, cafile, NULL);
-
-    /*
-    STACK_OF(X509_NAME) *calist = SSL_load_client_CA_file(cafile);
-    if (calist == 0) {
-        /* Not generally critical
-        printf("error loading client CA names from: %s",cafile);
-        //msg_warn("error loading client CA names from: %s",cafile);
-        //tls_print_errors();
+  srvCtx->ctx = SSL_CTX_new(TLS_server_method());
+  if (!srvCtx->ctx)
+    {
+      perror("Unable to create SSL context");
+      ERR_print_errors_fp(stderr);
+      exit(EXIT_FAILURE);
     }
-    SSL_CTX_set_client_CA_list(srvCtx->ctx, calist);
-    */
 
-    /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(srvCtx->ctx, srvCtx->cert, SSL_FILETYPE_PEM) <= 0)
-      {
-        ERR_print_errors_fp(stderr);
-	      exit(EXIT_FAILURE);
-      }
-    if (SSL_CTX_use_PrivateKey_file(srvCtx->ctx, srvCtx->key, SSL_FILETYPE_PEM) <= 0 )
-      {
-        ERR_print_errors_fp(stderr);
-	      exit(EXIT_FAILURE);
-      }
+  int verify_flags = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 
-    /* verify private key */
-    if (!SSL_CTX_check_private_key(srvCtx->ctx) )
-      {
-        printf("Private key does not match the public certificate\n");
-        ERR_print_errors_fp(stderr);
-        abort();
-      }
+  SSL_CTX_set_verify(srvCtx->ctx, verify_flags, NULL);
+  SSL_CTX_set_verify_depth(srvCtx->ctx, 5);
+
+  if (!SSL_CTX_use_certificate_chain_file(srvCtx->ctx, srvCtx->cafile))
+    {
+      ERR_print_errors_fp(stderr);
+      exit(EXIT_FAILURE);
+    }
+  SSL_CTX_load_verify_locations(srvCtx->ctx, srvCtx->cafile, NULL);
+
+  /* Set the key and cert */
+  if (SSL_CTX_use_certificate_file(srvCtx->ctx, srvCtx->cert, SSL_FILETYPE_PEM) <= 0)
+    {
+      ERR_print_errors_fp(stderr);
+      exit(EXIT_FAILURE);
+    }
+  if (SSL_CTX_use_PrivateKey_file(srvCtx->ctx, srvCtx->key, SSL_FILETYPE_PEM) <= 0 )
+    {
+      ERR_print_errors_fp(stderr);
+      exit(EXIT_FAILURE);
+    }
+
+  /* verify private key */
+  if (!SSL_CTX_check_private_key(srvCtx->ctx) )
+    {
+      printf("Private key does not match the public certificate\n");
+      ERR_print_errors_fp(stderr);
+      abort();
+    }
 }
 
 void socket_setup(sockaddr_in *address, serverContext *srvCtx)
@@ -188,22 +183,42 @@ void *connection_handler(void *socket_desc)
          }
      }
 
-     /**
-      * Versuch das Client-Zertifikat zu lesen
-      */
-     X509 *cert = SSL_get_peer_certificate(ssl);
-     if (cert == NULL)
-       printf("Error: Could not get a certificate from: %s.\n", "");
-     else
-       printf("Retrieved the server's certificate from: %s.\n", "");
+   /**
+    * Client-Zertifikat lesen und anzeigen
+    */
+   X509 *cert = SSL_get_peer_certificate(ssl);
+   if (cert == NULL)
+     printf("Error: Could not get a certificate from: %s.\n", "");
+   else
+     printf("Retrieved the server's certificate from: %s.\n", "");
 
-     X509_NAME *certname = X509_NAME_new();
-     certname = X509_get_subject_name(cert);
+   X509_NAME *certname = X509_NAME_new();
+   certname = X509_get_subject_name(cert);
 
-     printf("Displaying the certificate subject data:\n");
-     BIO *  bio  = BIO_new_fp(stdout, BIO_NOCLOSE);
-     X509_NAME_print_ex(bio, certname, 0, 0);
-     printf("\n");
+   printf("Displaying the certificate subject data:\n");
+   BIO *bio  = BIO_new_fp(stdout, BIO_NOCLOSE);
+   X509_NAME_print_ex(bio, certname, 0, 0);
+   printf("\n");
+
+   /**
+    * Extract the CN field
+    */
+   int cnidx = X509_NAME_get_index_by_NID(X509_get_subject_name(cert), NID_commonName, -1);
+	 //if (common_name_loc < 0) { }
+   X509_NAME_ENTRY *cnentry = X509_NAME_get_entry(X509_get_subject_name((X509 *) cert), cnidx);
+   //if (common_name_entry == NULL) { }
+   // Convert the CN field to a C string
+   ASN1_STRING *cnasn1 = X509_NAME_ENTRY_get_data(cnentry);
+   //if (common_name_asn1 == NULL) { }
+   char *cn = (char *)ASN1_STRING_get0_data(cnasn1);
+   printf("CN: %s\n",cn);
+
+   /**
+    * Extract validity dates
+    */
+   const ASN1_TIME *afterASN1 = X509_get0_notAfter(cert);
+   char *after = (char *)ASN1_STRING_get0_data(afterASN1);  //210506093551Z  yymmddhhnnssZ
+   printf("AFTER: %s\n",after);
 
    if (cc->sCtx->withSSL)
      SSL_read( ssl, buffer, 1024);
@@ -237,15 +252,14 @@ void socket_loop(sockaddr_in *address, serverContext *srvCtx)
   pthread_t thread_id;
 
   printf("Waiting for socket!\n");
-
   while( client_socket = accept(srvCtx->serverSocket, (struct sockaddr *)&address, (socklen_t*)&addrlen) )
       {
           printf("Connection accepted\n");
 
           connectionContext* cc = new connectionContext();
+
           cc->sCtx = srvCtx;
           cc->socket = client_socket;
-
           if( pthread_create(&thread_id , NULL ,  connection_handler, (void*)cc) < 0)
             {
               printf("could not create thread\n");
@@ -253,7 +267,6 @@ void socket_loop(sockaddr_in *address, serverContext *srvCtx)
       }
 
   printf("End of socket_loop\n");
-
   pthread_exit(NULL);
 }
 
@@ -271,6 +284,8 @@ int main(int argc, char const *argv[])
     {
       if (strcmp(argv[i],"-plain")==0)
         srvCtx->withSSL = false;
+      else if ((strcmp(argv[i],"-cafile")==0) && (i+1 < argc) && (strlen(argv[i+1]) > 0))
+        strncpy(srvCtx->cafile,argv[i+1],MAXFILENAME);
       else if ((strcmp(argv[i],"-cert")==0) && (i+1 < argc) && (strlen(argv[i+1]) > 0))
         strncpy(srvCtx->cert,argv[i+1],MAXFILENAME);
       else if ((strcmp(argv[i],"-key")==0) && (i+1 < argc) && (strlen(argv[i+1]) > 0))
@@ -280,8 +295,7 @@ int main(int argc, char const *argv[])
   //argument -plain cca deaktivate ssl for test purposes (it is all an example)
   if (srvCtx->withSSL = true)
     {
-      srvCtx->ctx = create_context();
-      configure_context(srvCtx);
+      create_ssl_context(srvCtx);
       printf("mit SSL\n");
     }
 
